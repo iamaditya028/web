@@ -1,0 +1,295 @@
+1.Create a Dockerfile named “tomcat”
+[aditya@aditya Dockerfile]$ cat tomcat
+FROM tomcat
+COPY sample.war /usr/local/tomcat/webapps
+CMD ["catalina.sh", "run"]
+EXPOSE 8080
+
+2.Build the dockerfile to make image.
+[aditya@aditya Dockerfile]$ docker build -t tomcat_dev -f tomcat .
+[+] Building 2.1s (7/7) FINISHED                                                                                                   	 
+ => [internal] load build definition from tomcat                                                                               	0.0s
+ => => transferring dockerfile: 190B                                                                                           	0.0s
+ => [internal] load .dockerignore                                                                                              	0.1s
+ => => transferring context: 2B                                                                                                	0.0s
+ => [internal] load metadata for docker.io/library/tomcat:latest                                                               	1.8s
+ => [internal] load build context                                                                                              	0.0s
+ => => transferring context: 4.70kB                                                                                            	0.0s
+ => CACHED [1/2] FROM docker.io/library/tomcat@sha256:7e4f2ad5dd9a6c80990aa89c882148c3497dc1ddd5b8ac1724f759686d40b25c         	0.0s
+ => [2/2] COPY sample.war /usr/local/tomcat/webapps                                                                            	0.1s
+ => exporting to image                                                                                                         	0.1s
+ => => exporting layers                                                                                                        	0.1s
+ => => writing image sha256:70e8021cd338f30d34f738c10e5f7f882512b6685c3c1a78034ef9ed46857578                                   	0.0s
+ => => naming to docker.io/library/tomcat_dev                                                                                  	0.0s
+
+3.check the image in local repository.
+[aditya@aditya Dockerfile]$ docker images
+REPOSITORY                	TAG   	IMAGE ID   	CREATED      	SIZE
+tomcat_dev                	latest	70e8021cd338   20 seconds ago   475MB
+gcr.io/k8s-minikube/kicbase   v0.0.39   67a4b1138d2d   6 days ago   	1.05GB
+baseapache2               	latest	9c1473906e81   1 weeks ago  	228MB
+myimageofubuntu           	latest	128c16797223   1 weeks ago  	120MB
+mysql                     	latest	4073e6a6f542   1 weeks ago  	530MB
+httpd                     	latest	daab1fa13f86   1 weeks ago  	145MB
+wordpress                 	latest	8fec96b2307f   1 weeks ago  	615MB
+postgres                  	latest	3b6645d2c145   1 weeks ago  	379MB
+hello-world               	latest	feb5d9fea6a5   1 hours ago	13.3kB
+
+4.Make container of that image running on port 8080.
+[aditya@aditya Dockerfile]$ docker run -d -p 8080:8080 70e8021cd338
+f445e3b5360070101f9c633eeea8c2ec33bcf24574d8ebd6196bcd8fe5b5f948
+[aditya@aditya Dockerfile]$ docker ps
+CONTAINER ID   IMAGE      	COMMAND         	CREATED     	STATUS     	PORTS                                   	NAMES
+f445e3b53600   70e8021cd338   "catalina.sh run"   6 seconds ago   Up 5 seconds   0.0.0.0:8080->8080/tcp, :::8080->8080/tcp   upbeat_neumann
+[aditya@aditya Dockerfile]$ minikube start
+😄  minikube v1.30.1 on Centos 9
+✨  Using the docker driver based on existing profile
+👍  Starting control plane node minikube in cluster minikube
+🚜  Pulling base image ...
+🔄  Restarting existing docker container for "minikube" ...
+
+🧯  Docker is nearly out of disk space, which may cause deployments to fail! (92% of capacity). You can pass '--force' to skip this check.
+💡  Suggestion:
+
+	Try one or more of the following to free up space on the device:
+    
+	1. Run "docker system prune" to remove unused Docker data (optionally with "-a")
+	2. Increase the storage allocated to Docker for Desktop by clicking on:
+	Docker icon > Preferences > Resources > Disk Image Size
+	3. Run "minikube ssh -- docker system prune" if using the Docker container runtime
+🍿  Related issue: https://github.com/kubernetes/minikube/issues/9024
+
+🐳  Preparing Kubernetes v1.26.3 on Docker 23.0.2 ...
+🔗  Configuring bridge CNI (Container Networking Interface) ...
+🔎  Verifying Kubernetes components...
+	▪ Using image gcr.io/k8s-minikube/storage-provisioner:v5
+	▪ Using image docker.io/kubernetesui/dashboard:v2.7.0
+	▪ Using image docker.io/kubernetesui/metrics-scraper:v1.0.8
+💡  Some dashboard features require the metrics-server addon. To enable all features please run:
+
+    minikube addons enable metrics-server    
+
+
+🌟  Enabled addons: default-storageclass, storage-provisioner, dashboard
+🏄  Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
+
+[aditya@aditya Dockerfile]$ docker images
+REPOSITORY                	TAG   	IMAGE ID   	CREATED         	SIZE
+tomcat_dev                	latest	70e8021cd338   About an hour ago   475MB
+gcr.io/k8s-minikube/kicbase   v0.0.39   67a4b1138d2d   6 days ago      	1.05GB
+baseapache2               	latest	9c1473906e81   1 weeks ago     	228MB
+myimageofubuntu           	latest	128c16797223   1 weeks ago     	120MB
+mysql                     	latest	4073e6a6f542   1 weeks ago     	530MB
+httpd                     	latest	daab1fa13f86   1 weeks ago     	145MB
+wordpress                 	latest	8fec96b2307f   1 weeks ago     	615MB
+postgres                  	latest	3b6645d2c145   1 weeks ago     	379MB
+hello-world               	latest	feb5d9fea6a5   1 hour ago   	13.3kB
+
+5.Deploy that image on Kubernetes.
+[aditya@aditya Dockerfile]$ minikube image load tomcat_dev
+
+[aditya@aditya Dockerfile]$ minikube image ls --format table
+|-----------------------------------------|---------|---------------|--------|
+|              	Image              	|   Tag   |   Image ID	|  Size  |
+|-----------------------------------------|---------|---------------|--------|
+| registry.k8s.io/kube-apiserver      	| v1.26.3 | 1d9b3cbae03ce | 134MB  |
+| registry.k8s.io/kube-controller-manager | v1.26.3 | ce8c2293ef09c | 123MB  |
+| registry.k8s.io/kube-proxy          	| v1.26.3 | 92ed2bec97a63 | 65.6MB |
+| docker.io/library/ubuntu            	| latest  | 08d22c0ceb150 | 77.8MB |
+| registry.k8s.io/etcd                	| 3.5.6-0 | fce326961ae2d | 299MB  |
+| registry.k8s.io/pause               	| 3.9 	| e6f1816883972 | 744kB  |
+| registry.k8s.io/coredns/coredns     	| v1.9.3  | 5185b96f0becf | 48.8MB |
+| docker.io/library/tomcat_dev        	| latest  | 70e8021cd338f | 475MB  |
+| docker.io/kubernetesui/dashboard    	| <none>  | 07655ddf2eebe | 246MB  |
+| docker.io/kubernetesui/metrics-scraper  | <none>  | 115053965e86b | 43.8MB |
+| gcr.io/k8s-minikube/storage-provisioner | v5  	| 6e38f40d628db | 31.5MB |
+| registry.k8s.io/kube-scheduler      	| v1.26.3 | 5a79047369329 | 56.4MB |
+|-----------------------------------------|---------|---------------|--------|
+
+6.Deployment file of web application
+[aditya@aditya Dockerfile]$ cat deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tomcat-d
+  namespace: testing
+  labels:
+	app: tomcat
+spec:
+  replicas: 1
+  selector:
+	matchLabels:
+  	app: tomcat
+  template:
+	metadata:
+  	labels:
+    	app: tomcat
+	spec:
+  	containers:
+  	- name: tomcat
+    	image: docker.io/library/tomcat_dev:latest
+    	imagePullPolicy: Never  
+    	ports:
+    	- containerPort: 8080
+
+7.Deploy the web application with creating namespace named testing.
+[aditya@aditya Dockerfile]$ kubectl create ns testing
+namespace/testing created
+[aditya@aditya Dockerfile]$ kubectl get ns
+NAME               	STATUS   AGE
+default            	Active   4d1h
+kube-node-lease    	Active   4d1h
+kube-public        	Active   4d1h
+kube-system        	Active   4d1h
+kubernetes-dashboard   Active   4d
+testing            	Active   22s
+
+
+[aditya@aditya Dockerfile]$ kubectl apply -f deployment.yaml
+deployment.apps/tomcat-d created
+[aditya@aditya Dockerfile]$ kubectl get pods
+No resources found in default namespace.
+[aditya@aditya Dockerfile]$ kubectl get pods -n testing
+NAME                    	READY   STATUS	RESTARTS   AGE
+tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	51s
+
+[aditya@aditya Dockerfile]$ kubectl get all -n testing
+NAME                        	READY   STATUS	RESTARTS   AGE
+pod/tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	2m31s
+
+NAME                   	READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/tomcat-d   1/1 	1        	1       	2m31s
+
+NAME                              	DESIRED   CURRENT   READY   AGE
+replicaset.apps/tomcat-d-65b56565c7   1     	1     	1   	2m31s
+[aditya@aditya Dockerfile]$ cat service.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: tomcat-service1
+  namespace: testing
+spec:
+  selector:
+	app: tomcat
+  ports:
+  - protocol: TCP
+	port: 80
+	targetPort: 8081
+  type: NodePort
+
+[aditya@aditya Dockerfile]$ kubectl get all -n testing
+NAME                        	READY   STATUS	RESTARTS   AGE
+pod/tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	2m31s
+
+NAME                   	READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/tomcat-d   1/1 	1        	1       	2m31s
+
+NAME                              	DESIRED   CURRENT   READY   AGE
+replicaset.apps/tomcat-d-65b56565c7   1     	1     	1   	2m31s
+
+[aditya@aditya Dockerfile]$ kubectl apply -f service.yaml
+service/tomcat-service created
+[aditya@aditya Dockerfile]$ kubectl get svc -n testing
+NAME         	TYPE   	CLUSTER-IP  	EXTERNAL-IP   PORT(S)    	AGE
+tomcat-service   NodePort   10.108.176.71   <none>    	80:31736/TCP   28s
+
+[aditya@aditya Dockerfile]$ minikube service tomcat-service --url -n testing
+http://192.168.49.2:31736
+[aditya@aditya Dockerfile]$ minikube service tomcat-service  -n testing
+|-----------|----------------|-------------|---------------------------|
+| NAMESPACE |  	NAME  	| TARGET PORT |        	URL        	|
+|-----------|----------------|-------------|---------------------------|
+| testing   | tomcat-service |      	80 | http://192.168.49.2:31736 |
+|-----------|----------------|-------------|---------------------------|
+🎉  Opening service testing/tomcat-service in default browser...
+[aditya@aditya Dockerfile]$ cat service.yaml
+
+[aditya@aditya Dockerfile]$ kubectl get pod -n testing
+NAME                    	READY   STATUS	RESTARTS   AGE
+tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	17m
+[aditya@aditya Dockerfile]$ kubectl get pod -n testing -o wide
+NAME                    	READY   STATUS	RESTARTS   AGE   IP        	NODE   	NOMINATED NODE   READINESS GATES
+tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	17m   10.244.0.28   minikube   <none>       	<none>
+[aditya@aditya Dockerfile]$ vim service.yaml
+[aditya@aditya Dockerfile]$ kubectl apply -f service.yaml
+service/tomcat-service1 created
+[aditya@aditya Dockerfile]$ kubectl get svc -n testing
+NAME          	TYPE   	CLUSTER-IP  	EXTERNAL-IP   PORT(S)    	AGE
+tomcat-service	NodePort   10.108.176.71   <none>    	80:31736/TCP   11m
+tomcat-service1   NodePort   10.103.26.137   <none>    	80:31477/TCP   43s
+[aditya@aditya Dockerfile]$ minikube service tomcat-service  -n testing
+|-----------|----------------|-------------|---------------------------|
+| NAMESPACE |  	NAME  	| TARGET PORT |        	URL        	|
+|-----------|----------------|-------------|---------------------------|
+| testing   | tomcat-service |      	80 | http://192.168.49.2:31736 |
+|-----------|----------------|-------------|---------------------------|
+🎉  Opening service testing/tomcat-service in default browser...
+[aditya@aditya Dockerfile]$ minikube service tomcat-service1  -n testing
+|-----------|-----------------|-------------|---------------------------|
+| NAMESPACE |  	NAME   	| TARGET PORT |        	URL        	|
+|-----------|-----------------|-------------|---------------------------|
+| testing   | tomcat-service1 |      	80 | http://192.168.49.2:31477 |
+|-----------|-----------------|-------------|---------------------------|
+🎉  Opening service testing/tomcat-service1 in default browser...
+[aditya@aditya Dockerfile]$ kubectl describe service tomcat-service
+Error from server (NotFound): services "tomcat-service" not found
+[aditya@aditya Dockerfile]$ kubectl describe service tomcat-service -n testing
+Name:                 	tomcat-service
+Namespace:            	testing
+Labels:               	<none>
+Annotations:          	<none>
+Selector:             	app=tomcat
+Type:                 	NodePort
+IP Family Policy:     	SingleStack
+IP Families:          	IPv4
+IP:                   	10.108.176.71
+IPs:                  	10.108.176.71
+Port:                 	<unset>  80/TCP
+TargetPort:           	8080/TCP
+NodePort:             	<unset>  31736/TCP
+Endpoints:            	10.244.0.28:8080
+Session Affinity:     	None
+External Traffic Policy:  Cluster
+Events:               	<none>
+
+[aditya@aditya Dockerfile]$ kubectl describe service tomcat-service1 -n testing
+Name:                 	tomcat-service1
+Namespace:            	testing
+Labels:               	<none>
+Annotations:          	<none>
+Selector:             	app=tomcat
+Type:                 	NodePort
+IP Family Policy:     	SingleStack
+IP Families:          	IPv4
+IP:                   	10.103.26.137
+IPs:                  	10.103.26.137
+Port:                 	<unset>  80/TCP
+TargetPort:           	8081/TCP
+NodePort:             	<unset>  31477/TCP
+Endpoints:            	10.244.0.28:8081
+Session Affinity:     	None
+External Traffic Policy:  Cluster
+Events:               	<none>
+[aditya@aditya Dockerfile]$ kubectl get pod -n testing -o wide
+NAME                    	READY   STATUS	RESTARTS   AGE   IP        	NODE   	NOMINATED NODE   READINESS GATES
+tomcat-d-65b56565c7-5sdgh   1/1 	Running   0      	26m   10.244.0.28   minikube   <none>       	<none>
+
+8.Host the application locally using port-forwarding method.
+[aditya@aditya Dockerfile]$ kubectl port-forward tomcat-d-65b56565c7-5sdgh 8080:8080 -n testing
+Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+Handling connection for 8080
+Handling connection for 8080
+
+
+
+
+
+
+
+
+
+
+
+
+
