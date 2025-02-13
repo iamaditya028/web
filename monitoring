@@ -1,0 +1,380 @@
+
+aditya@aditya:~$kubectl create namespace monitoring
+
+Now, Deploy Prometheus:
+Create a Kubernetes deployment for Prometheus by applying the following manifest file:
+
+Step 1: Create a file named prometheus.yml and copy the following objects.
+aditya@aditya:~$ vim prometheus.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: monitoring
+  labels:
+	app: prometheus
+spec:
+  type: NodePort
+  selector:
+	app: prometheus
+  ports:
+	- name: web
+  	port: 9090
+  	targetPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+	matchLabels:
+  	app: prometheus
+  template:
+	metadata:
+  	labels:
+    	app: prometheus
+	spec:
+  	containers:
+    	- name: prometheus
+      	image: prom/prometheus:v2.33.1
+      	args:
+        	- "--config.file=/etc/prometheus/prometheus.yml"
+        	- "--storage.tsdb.path=/prometheus/"
+      	ports:
+        	- name: web
+          	containerPort: 9090
+      	volumeMounts:
+        	- name: config-volume
+          	mountPath: /etc/prometheus/
+        	- name: storage-volume
+          	mountPath: /prometheus/
+  	volumes:
+    	- name: config-volume
+      	configMap:
+        	name: prometheus-config
+    	- name: storage-volume
+      	emptyDir: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |-
+	global:
+  	scrape_interval: 15s
+	scrape_configs:
+  	- job_name: 'prometheus'
+    	static_configs:
+      	- targets: ['localhost:9090']
+  	- job_name: 'node-exporter'
+    	static_configs:
+      	- targets: ['node-exporter.monitoring.svc.cluster.local:9100']
+
+Now we are going to apply this manifest file 
+Note:-Apply manages applications through files defining Kubernetes resources. It creates and updates resources in a cluster through running kubectl
+Send the manifest to the Kubernetes API server
+
+Run the following command: kubectl apply -f prometheus.yml
+
+1.Check that it worked by running the following:  kubectl port-forward prometheus-deployment-8478788cf7-llwr8 9090:9090 -n monitoring
+
+
+2.Navigate to localhost:9090 in your browser. You should see a prometheus page.
+
+
+
+aditya@aditya:~$ kubectl get pods -n monitoring
+
+
+Connecting To Prometheus Dashboard
+You can view the deployed Prometheus dashboard in two different ways.
+1.Using Kubectl port forwarding
+2.Exposing the Prometheus deployment as a service with NodePort or a Load Balancer.
+
+Execute the following command with your pod name to access Prometheus from localhost port 9090.
+aditya@aditya:~$ kubectl port-forward prometheus-deployment-8478788cf7-llwr8 9090:9090 -n monitoring
+
+Now, if we are able to access http://localhost:9090 or http://127.0.0.1:9090
+ on our  browser, we will get the Prometheus home page.
+
+Or,
+2nd Step to get prometheus homepage outside the cluster 
+NOTE:-If we are using nodePort in service object in service.yml manifest file then home page can bes accessible outside the cluster here the important thing is that by default service can run only between ports 30,000-32767 and pod automatically run on this default port .It is randomly given to pod. ,
+aditya@aditya:~$kubectl get service -n monitoring
+
+aditya@aditya:~$ minikube service prometheus-service -n monitoring
+
+
+After execute this command you will able to get access the prometheus home page outside the cluster. 
+
+
+
+Node-Exporter
+Deploying Node Exporter on Kubernetes Cluster
+Prerequisites:
+●A Kubernetes cluster
+●kubectl client library to connect to Kubernetes Cluster
+●up & and running Prometheus Server 
+Create a file node-exporter.yml
+Copy the following content into a file called node-exporter.yml. Here we are using monitoring namespace that we have already created while deploying Prometheus Server
+In this manifest file we have to create namespace=monitoring as we have already done.
+aditya@aditya:~$ vim node-exporter.yml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+	app: node-exporter
+  name: node-exporter
+  namespace: monitoring
+spec:
+  selector:
+	matchLabels:
+  	app: node-exporter
+  template:
+	metadata:
+  	labels:
+    	app: node-exporter
+	spec:
+  	containers:
+  	- args:
+    	- --path.sysfs=/host/sys
+    	- --path.rootfs=/host/root
+    	- --no-collector.wifi
+    	- --no-collector.hwmon
+    	- --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/pods/.+)($|/)
+    	- --collector.netclass.ignored-devices=^(veth.*)$
+    	name: node-exporter
+    	image: prom/node-exporter
+    	ports:
+      	- containerPort: 9100
+        	protocol: TCP
+    	resources:
+      	limits:
+        	cpu: 250m
+        	memory: 180Mi
+      	requests:
+        	cpu: 102m
+        	memory: 180Mi
+    	volumeMounts:
+    	- mountPath: /host/sys
+      	mountPropagation: HostToContainer
+      	name: sys
+      	readOnly: true
+    	- mountPath: /host/root
+      	mountPropagation: HostToContainer
+      	name: root
+      	readOnly: true
+  	volumes:
+  	- hostPath:
+      	path: /sys
+    	name: sys
+  	- hostPath:
+      	path: /
+    	name: root
+
+Send the manifest to the Kubernetes API server
+Run the following command: kubectl apply -f node-exportr.yml
+1.Check that it worked by running the following:  kubectl port-forward node-exporter-blqd7 9100:9100 -n monitoring
+
+
+
+2.Navigate to localhost:9100 in your browser. You should see a Node-exporter metrics page.
+aditya@aditya:~$ kubectl apply -f node-exporter.yaml
+Now,write a service.yml file for node-exporer
+Now we are going to deploy a Kubernetes service for node-exporter ,Copy the following yaml content into a file called node-exporter-service.yaml.
+aditya@aditya:~$ vim node-exporter-service.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: node-exporter
+  namespace: monitoring
+spec:
+  selector:
+  	app: node-exporter
+  ports:
+  - name: node-exporter
+	protocol: TCP
+	port: 9100
+	targetPort: 9100
+
+
+
+Check the status with ip
+aditya@aditya:~$ kubectl get service -n monitoring
+
+Connect to Prometheus console using kubectl port-forwarding, see below, also check the pod status;
+aditya@aditya:~$ kubectl get pods -n monitoring
+
+aditya@aditya:~$ kubectl port-forward node-exporter-blqd7 9100:9100 -n monitoring
+
+from browser you can access Prometheus console by using url: http://localhost:8080 
+See the targets section screen shot below for node-exporter target.
+
+
+Or
+2nd Step to get Node-exporter homepage outside the cluster 
+aditya@aditya:~minikube service node-exporter -n monitoring
+
+
+
+
+Grafana
+NOW ,Create a Grafana Kubernetes manifest
+	Create a file called grafana.yaml. And in this file we create namespace=monitoring for grafana.
+	Copy and paste the following contents and save the file.
+aditya@aditya:~$ vim grafana.yaml
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+	- ReadWriteOnce
+  resources:
+	requests:
+  	storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+	app: grafana
+  name: grafana
+  namespace: monitoring
+spec:
+  selector:
+	matchLabels:
+  	app: grafana
+  template:
+	metadata:
+  	labels:
+    	app: grafana
+	spec:
+  	securityContext:
+    	fsGroup: 472
+    	supplementalGroups:
+      	- 0
+  	containers:
+    	- name: grafana
+      	image: grafana/grafana:9.1.0
+      	imagePullPolicy: IfNotPresent
+      	ports:
+        	- containerPort: 3000
+          	name: http-grafana
+          	protocol: TCP
+      	readinessProbe:
+        	failureThreshold: 3
+        	httpGet:
+          	path: /robots.txt
+          	port: 3000
+          	scheme: HTTP
+        	initialDelaySeconds: 10
+        	periodSeconds: 30
+        	successThreshold: 1
+        	timeoutSeconds: 2
+      	livenessProbe:
+        	failureThreshold: 3
+        	initialDelaySeconds: 30
+        	periodSeconds: 10
+        	successThreshold: 1
+        	tcpSocket:
+          	port: 3000
+        	timeoutSeconds: 1
+      	resources:
+        	requests:
+          	cpu: 250m
+          	memory: 750Mi
+      	volumeMounts:
+        	- mountPath: /var/lib/grafana
+          	name: grafana-pv
+  	volumes:
+    	- name: grafana-pv
+      	persistentVolumeClaim:
+        	claimName: grafana-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  ports:
+	- port: 3000
+  	protocol: TCP
+  	targetPort: http-grafana
+  selector:
+	app: grafana
+  sessionAffinity: None
+  type: nodePort
+
+
+Now Check the status
+aditya@aditya:~$ kubectl get pods -n monitoring
+
+
+Send the manifest to the Kubernetes API server
+
+Run the following command: kubectl apply -f grafana.yaml
+
+1.Check that it worked by running the following:  kubectl port-forward grafana-56cc784dd9-9wzvl 3000:3000 -n monitoring
+2.Navigate to localhost:3000 in your browser. You should see a Grafana login page.
+3.Use admin for both the adityaname and password to login.
+
+
+
+
+Also check the grafana service
+aditya@aditya:~$ kubectl get service -n monitoring
+
+
+
+aditya@aditya:~$ kubectl port-forward grafana-56cc784dd9-9wzvl 3000:3000 -n monitoring
+
+
+Now see the login page 
+
+Or 
+2nd Step to get Grafana homepage outside the cluster 
+aditya@aditya:~$ minikube service grafana -n monitoring
+
+
+
+
+
+
+
+Now Next,
+Creating grafana Dashboard,
+Now add th data source in grafana for monitoring the cluster resources
+
+Select your pod ip and put in and test it is working or not
+http://10.107.25.101:9090
+
+
+
+
+
+
+NOw monitoring the system  
+Import  node-exporter dashboard id from grafna.lab official site and monitoring the resources
+
+
+
+
+
+
+
+
+
+
+
+
